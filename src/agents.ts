@@ -35,8 +35,8 @@ export const AGENTS: Record<string, AgentDef> = {
     role: 'Chief Executive Agent',
     emoji: '🧭',
     color: '#F8FAFC',
-    specialty: '오케스트레이션, 작업 분해, 종합 판단, 다음 액션 결정',
-    tagline: '회사 전체 의사결정과 작업 분배를 맡습니다'
+    specialty: '마케팅 대행사 운영 총괄, 광고주 요청을 작업으로 분해·분배, 캠페인 종합 판단, 다음 액션 결정',
+    tagline: '광고주 요청을 받아 팀에 분배하고 캠페인을 총괄합니다'
   },
   youtube: {
     id: 'youtube',
@@ -44,8 +44,8 @@ export const AGENTS: Record<string, AgentDef> = {
     role: 'Head of YouTube',
     emoji: '📺',
     color: '#FF4444',
-    specialty: '유튜브 채널 운영, 영상 기획서(제목·후크·구조), 트렌드 분석, 썸네일 브리프, 업로드 메타데이터, 시청자 유지율 전략',
-    tagline: '유튜브 채널 기획·운영 전반을 책임집니다',
+    specialty: '광고주 유튜브 채널 운영 대행, 영상 광고·브랜디드 콘텐츠 기획(제목·후크·구조), 트렌드 분석, 썸네일 브리프, 성과 리포트',
+    tagline: '광고주 유튜브 채널과 영상 캠페인을 대행합니다',
     profileImage: 'leo_profile.png',
     persona: '데이터 중심·솔직·자신감 있는 톤. "사장님"이라고 부르고, 결론을 먼저 말한 뒤 데이터 근거로 뒷받침. 추측보다 숫자. 가끔 직설적이지만 따뜻함은 잃지 않음. 이모티콘은 자제하되 "🔥"·"📊"·"🎯" 같은 핵심 강조용은 OK.'
   },
@@ -55,8 +55,8 @@ export const AGENTS: Record<string, AgentDef> = {
     role: 'Head of Instagram',
     emoji: '📷',
     color: '#E1306C',
-    specialty: '인스타그램 릴스/피드 콘셉트, 캡션, 해시태그 전략, 게시 시간, 스토리, 팔로워 인게이지먼트',
-    tagline: '인스타 콘텐츠 기획과 인게이지먼트를 끌어올립니다'
+    specialty: '광고주 인스타그램 운영 대행, 릴스/피드 콘셉트, 캡션, 해시태그, 인플루언서·체험단 협업 기획(광고 표기 준수), 인게이지먼트 리포트',
+    tagline: '광고주 인스타 계정과 인플루언서 캠페인을 대행합니다'
   },
   designer: {
     id: 'designer',
@@ -64,8 +64,8 @@ export const AGENTS: Record<string, AgentDef> = {
     role: 'Lead Designer',
     emoji: '🎨',
     color: '#A78BFA',
-    specialty: '브랜드 디자인 브리프(컬러·타이포·레퍼런스), 썸네일 컨셉 3안, 비주얼 시스템, 디자인 가이드',
-    tagline: '브랜드와 시각 자산 디자인을 담당합니다'
+    specialty: '광고 소재 디자인 브리프(배너·썸네일·상세페이지), 광고주 브랜드 가이드, 소재 A/B 시안, 라이선스 확인된 에셋만 사용',
+    tagline: '광고 소재와 광고주 브랜드 비주얼을 만듭니다'
   },
   developer: {
     id: 'developer',
@@ -84,8 +84,8 @@ export const AGENTS: Record<string, AgentDef> = {
     role: '비즈니스 전략가 · Head of Business',
     emoji: '💼',
     color: '#F5C518',
-    specialty: '수익화 모델, 가격 전략, 시장·경쟁 분석, ROI/KPI 설계, 비즈니스 의사결정',
-    tagline: '수익화·가격·전략 의사결정을 같이 봅니다',
+    specialty: '광고주 영업·제안서, 대행 견적·요금제 설계, 캠페인 ROI/KPI 설계, 광고주 매출·계약 관리',
+    tagline: '광고주 영업·견적·ROI로 회사 매출을 만듭니다',
     profileImage: '현빈.jpeg'
   },
   secretary: {
@@ -116,8 +116,8 @@ export const AGENTS: Record<string, AgentDef> = {
     role: 'Copywriter',
     emoji: '✍️',
     color: '#FBBF24',
-    specialty: '카피라이팅, 영상 스크립트 초안, 인스타 캡션, 블로그 글, 메일 톤앤매너, 후크 작성',
-    tagline: '카피·스크립트·후크를 글로 풀어냅니다'
+    specialty: '광고 카피, 상세페이지·랜딩 문구, 영상 스크립트, 블로그 원고, 광고주 제안 메일 (표시·광고 규칙 준수)',
+    tagline: '규칙을 지키면서 전환되는 광고 카피를 씁니다'
   },
   researcher: {
     id: 'researcher',
@@ -125,8 +125,8 @@ export const AGENTS: Record<string, AgentDef> = {
     role: 'Trend & Data Researcher',
     emoji: '🔍',
     color: '#60A5FA',
-    specialty: '트렌드 리서치, 경쟁사 분석, 데이터 수집·요약, 인용 자료 정리, 사실 확인',
-    tagline: '트렌드와 데이터를 모아 사실 확인까지 끝냅니다'
+    specialty: '광고주 업종·타겟 리서치, 경쟁사 광고 분석, 트렌드·데이터 수집, 광고 문구 근거(출처) 확보, 사실 확인',
+    tagline: '광고주 시장·경쟁사를 조사하고 광고 근거를 확보합니다'
   }
 };
 

@@ -782,6 +782,8 @@ const SYSTEM_PROMPT = _loadPrompt('system.md');
 /* v2.89.64 — AgentDef interface, AGENTS map, AGENT_ORDER, SPECIALIST_IDS
    moved to src/agents.ts. extension.ts only imports them now. ~118 lines saved. */
 import { AgentDef, AGENTS, AGENT_ORDER, SPECIALIST_IDS } from './agents';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const rulesCore = require('./rules-core.js');
 
 // ───────────────────────────────────────────────────────────────────────────
 // Connected campus world (Phase B-1 — multi-zone layout).
@@ -5078,6 +5080,10 @@ function ensureCompanyStructure(): string {
     _seedAgentToolsManifestIfMissing(id);
   });
 
+  const rulesPath = path.join(dir, '_shared', 'rules.md');
+  if (!fs.existsSync(rulesPath)) {
+    fs.writeFileSync(rulesPath, rulesCore.DEFAULT_RULES_MD);
+  }
   const goalsPath = path.join(dir, '_shared', 'goals.md');
   if (!fs.existsSync(goalsPath)) {
     fs.writeFileSync(goalsPath,
@@ -5086,13 +5092,12 @@ function ensureCompanyStructure(): string {
 _이 파일은 **모든 에이전트가 매번 읽는** 회사의 북극성입니다. 자유롭게 편집하세요._
 
 ## 장기 목표 (1년)
-- [ ] (예) 유튜브 구독자 10만 달성
-- [ ] (예) 인스타그램 팔로워 5만
-- [ ] (예) 월 수익 500만원
+- [ ] (예) 고정 광고주(리테이너) 5곳 확보
+- [ ] (예) 월 매출 500만원
 
 ## 단기 목표 (1개월)
-- [ ] (예) 영상 4개 업로드
-- [ ] (예) 릴스 12개 게시
+- [ ] (예) 포트폴리오용 캠페인 사례 2건 완성
+- [ ] (예) 잠재 광고주 제안서 10건 발송
 `);
   }
   const idPath = path.join(dir, '_shared', 'identity.md');
@@ -7559,7 +7564,29 @@ OS 차이: 백그라운드 프로세스는 맥/리눅스에선 \`nohup ... &\`, 
   · 진행중 = 다음 스텝에서 더 진전 가능
   · 대기 = 다른 에이전트/사람의 입력이 필요해 지금은 멈춤
 - 마지막 줄: \`📝 다음 단계: <한 줄, 구체적 액션>\` (대기 상태면 "대기 — <누구의 무엇이 필요>" 형식)
-- 자가평가 없이 끝나면 시스템이 산출물을 거부합니다.`;
+- 자가평가 없이 끝나면 시스템이 산출물을 거부합니다.${rulesCore.rulesPromptBlock(readCompanyRules())}`;
+}
+
+/* 회사 기본 규칙 — _shared/rules.md. 대표는 개별 산출물을 검토하지 않고,
+   규칙 위반이 감지된 산출물만 텔레그램 승인 큐로 보낸다. */
+function _rulesPath(): string {
+  return path.join(getCompanyDir(), '_shared', 'rules.md');
+}
+function readCompanyRules(): string {
+  return _safeReadText(_rulesPath());
+}
+/** 산출물 자동 규칙 검사. 통과면 null, 위반이면 생성된 승인 요청을 반환. */
+function enforceCompanyRules(agentId: string, output: string, sessionDir: string, task: string): PendingApproval | null {
+  const violations = rulesCore.checkRules(output, readCompanyRules());
+  if (!violations.length) return null;
+  const list = rulesCore.formatViolations(violations);
+  return createApproval({
+    agentId,
+    kind: 'rules.violation',
+    title: `규칙 위반 감지 — ${task.slice(0, 60)}`,
+    summary: `${list}\n\n승인하면 예외로 통과, 거부하면 해당 산출물은 사용 금지 처리됩니다.`,
+    payload: { sessionDir, task, violations },
+  });
 }
 
 // ============================================================
@@ -20221,6 +20248,16 @@ ${catalog.map((c, i) => `${i + 1}. agent=${c.agentId} tool=${c.tool} — ${c.des
                     /* 파일 액션 실패해도 dispatch 진행. 로그만 남김. */
                     try { post({ type: 'response', value: `⚠️ ${a.emoji} ${a.name} 파일 액션 처리 중 오류: ${e?.message || e}` }); } catch { /* ignore */ }
                 }
+
+                /* 규칙 게이트 — 통과면 그대로 진행, 위반이면 텔레그램 승인 대기로 보내고
+                   산출물에 보류 표시. 대표는 위반 건만 판단한다. */
+                try {
+                    const held = enforceCompanyRules(t.agent, out, sessionDir, t.task);
+                    if (held) {
+                        out = `> ⛔ **규칙 위반 감지 — 대표 승인 대기** (\`/approve ${held.id.slice(-9)}\` · \`/reject ${held.id.slice(-9)}\`)\n> ${held.summary.split('\n\n')[0].replace(/\n/g, '\n> ')}\n\n${out}`;
+                        post({ type: 'response', value: `⛔ ${a.emoji} ${a.name} 산출물 규칙 위반 → 텔레그램 승인 요청 보냄` });
+                    }
+                } catch { /* 규칙 검사 실패해도 dispatch 진행 */ }
 
                 outputs[t.agent] = out;
                 /* v2.89.51 — 작업 라운드 메타데이터 수집. CEO 보고에 도구·데이터·핵심 인용. */
