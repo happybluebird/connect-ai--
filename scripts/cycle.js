@@ -25,6 +25,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const axios = require('axios');
+const rulesCore = require('../src/rules-core.js');
 
 // ───────────────────────── Config (env-overridable) ─────────────────────────
 const BRAIN_DIR = (process.env.BRAIN_DIR || path.join(os.homedir(), '.connect-ai-brain')).replace(/^~/, os.homedir());
@@ -60,6 +61,36 @@ async function callLLM(engine, system, user) {
     return r.data.message?.content || '';
 }
 
+// ───────────────────────── Rule gate → Telegram approval ─────────────────────────
+// 형식은 extension.ts 의 createApproval 과 동일 → IDE 쪽 텔레그램 봇의 /approve · /reject 로 처리됨.
+async function holdForApproval(violations) {
+    const stamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
+    const id = `apr-${stamp}-${Math.random().toString(36).slice(2, 6)}`;
+    const list = rulesCore.formatViolations(violations);
+    const ap = {
+        id, agentId: 'ceo', kind: 'rules.violation', createdAt: new Date().toISOString(),
+        title: '규칙 위반 감지 — 자율 사이클 산출물',
+        summary: `${list}\n\n승인하면 예외로 통과, 거부하면 해당 산출물은 사용 금지 처리됩니다.`,
+        payload: { source: 'cycle.js', violations },
+    };
+    const dir = path.join(BRAIN_DIR, 'approvals', 'pending');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, `${id}.json`), JSON.stringify(ap, null, 2));
+    fs.writeFileSync(path.join(dir, `${id}.md`), `# ⏳ 승인 대기 — ${ap.title}\n\n- **id:** \`${id.slice(-9)}\`\n\n## 요약\n\n${ap.summary}\n`);
+    try {
+        const cfg = JSON.parse(safeRead(path.join(BRAIN_DIR, '_agents', 'secretary', 'tools', 'telegram_setup.json')) || '{}');
+        const token = String(cfg.TELEGRAM_BOT_TOKEN || '').trim();
+        const chatId = String(cfg.TELEGRAM_CHAT_ID || '').trim();
+        if (token && chatId) {
+            await axios.post(`https://api.telegram.org/bot${token}/sendMessage`, {
+                chat_id: chatId,
+                text: `⏳ 승인 대기 (🌙 자율 사이클)\n\n${ap.title}\n\n${list}\n\n승인: /approve ${id.slice(-9)} · 거부: /reject ${id.slice(-9)}`,
+            }, { timeout: 10000 });
+        }
+    } catch (e) { console.error('· Telegram notify failed:', e.message); }
+    return ap;
+}
+
 // ───────────────────────── Cycle body ─────────────────────────
 async function runCycle() {
     if (!fs.existsSync(path.join(BRAIN_DIR, '_shared'))) {
@@ -72,8 +103,11 @@ async function runCycle() {
     const identity = safeRead(path.join(BRAIN_DIR, '_shared', 'identity.md')).slice(0, 1500);
     const goals = safeRead(path.join(BRAIN_DIR, '_shared', 'goals.md')).slice(0, 2000);
     const decisions = safeRead(path.join(BRAIN_DIR, '_shared', 'decisions.md')).slice(-2000);
+    const rulesPath = path.join(BRAIN_DIR, '_shared', 'rules.md');
+    if (!fs.existsSync(rulesPath)) fs.writeFileSync(rulesPath, rulesCore.DEFAULT_RULES_MD);
+    const rules = safeRead(rulesPath);
 
-    const sysPrompt = `당신은 자율적으로 운영되는 1인 AI 기업의 CEO입니다. 사용자가 자리에 없는 동안 회사를 가치 있는 방향으로 한 걸음 진전시키는 단일 작업을 결정하고 실행합니다.
+    const sysPrompt = `당신은 자율적으로 운영되는 AI 마케팅 대행사의 CEO입니다. 사용자가 자리에 없는 동안 회사를 가치 있는 방향으로 한 걸음 진전시키는 단일 작업을 결정하고 실행합니다.
 
 [회사 정체성]
 ${identity}
@@ -95,13 +129,21 @@ ${decisions}
 (실제 산출물 — 영상 기획서·카피·전략 분석 등 즉시 사용 가능한 형태)
 
 ## 다음 사이클 추천
-(다음에 할 가치 있는 1~2가지)`;
+(다음에 할 가치 있는 1~2가지)${rulesCore.rulesPromptBlock(rules)}`;
 
     const userMsg = `현재 시각: ${new Date().toISOString()}. 사용자가 자리를 비웠습니다. 회사 가치를 높이는 한 걸음을 진행하세요.`;
 
     console.log('· Calling LLM...');
-    const out = await callLLM(engine, sysPrompt, userMsg);
+    let out = await callLLM(engine, sysPrompt, userMsg);
     if (!out.trim()) throw new Error('Empty LLM response.');
+
+    // 규칙 게이트 — 통과면 그대로, 위반이면 승인 대기 + 텔레그램 알림
+    const violations = rulesCore.checkRules(out, rules);
+    if (violations.length) {
+        const ap = await holdForApproval(violations);
+        out = `> ⛔ **규칙 위반 감지 — 대표 승인 대기** (\`/approve ${ap.id.slice(-9)}\` · \`/reject ${ap.id.slice(-9)}\`)\n\n${out}`;
+        console.log(`⛔ Rule violation → approval ${ap.id}`);
+    }
 
     // Save to a session folder
     const sessionDir = path.join(BRAIN_DIR, 'sessions', `auto-${nowTs()}`);
@@ -151,7 +193,7 @@ runCycle().catch((e) => {
 # Then: launchctl load ~/Library/LaunchAgents/com.connectai.cycle.plist
 
 # Linux/macOS cron — every 30 minutes
-# */30 * * * * /usr/local/bin/node /path/to/cycle.js >> ~/.connect-ai-brain/cycle.log 2>&1
+# 0,30 * * * * /usr/local/bin/node /path/to/cycle.js >> ~/.connect-ai-brain/cycle.log 2>&1
 
 # Windows Task Scheduler — create a task that runs node.exe with this script as arg
 # every 30 min, with working directory set to the brain folder.
